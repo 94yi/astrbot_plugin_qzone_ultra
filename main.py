@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import copy
 import importlib.util
 import os
 import inspect
@@ -1139,6 +1140,7 @@ class QzoneStablePlugin(Star):
             ("page/delete", self.page_delete, ["POST"], "Qzone Page delete"),
             ("page/upload-media", self.page_upload_media, ["POST"], "Qzone Page upload media"),
             ("page/media", self.page_media, ["GET"], "Qzone Page media stream"),
+            ("settings", self.page_settings, ["GET", "POST"], "Qzone settings panel"),
         )
         for endpoint, handler, methods, description in routes:
             path = f"/{self.plugin_name}/{endpoint}"
@@ -1203,6 +1205,32 @@ class QzoneStablePlugin(Star):
             data = await self._maybe_await(getattr(request, "json", None))
         return data if isinstance(data, dict) else {}
 
+    def _panel_config(self) -> Any | None:
+        context = getattr(self, "_context", None) or getattr(self, "context", None)
+        getter = getattr(context, "get_registered_star", None)
+        metadata = getter(self.plugin_name) if callable(getter) else None
+        return getattr(metadata, "config", None)
+
+    async def page_settings(self):
+        async def handle():
+            config = self._panel_config()
+            if config is None:
+                raise QzoneBridgeError("插件配置尚未就绪")
+            if str(getattr(_quart_request, "method", "GET")).upper() == "GET":
+                values = copy.deepcopy(dict(config))
+                values["cookies_str"] = ""
+                return {"schema": config.schema, "config": values, "cookie_configured": bool(config.get("cookies_str"))}
+            body = await self._page_json_body()
+            values = body.get("config") if isinstance(body.get("config"), dict) else {}
+            if not values:
+                raise QzoneBridgeError("没有可保存的配置")
+            merged = copy.deepcopy(dict(config))
+            for key, value in values.items():
+                if key in config.schema and (key != "cookies_str" or str(value or "").strip()):
+                    merged[key] = value
+            config.save_config(merged)
+            return {"saved": True, "reload_required": True}
+        return await self._page_json(handle)
     async def page_status(self):
         return await self._page_json(self.page_api.status)
 

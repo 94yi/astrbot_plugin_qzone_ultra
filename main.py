@@ -5404,7 +5404,7 @@ class QzoneStablePlugin(Star):
             except QzoneBridgeError as exc:
                 logger.warning("qzone config cookie bind failed: %s", exc)
         self._start_scheduled_tasks()
-        self._schedule_bootstrap_auto_bind("initialize", force_refresh=True)
+        self._schedule_bootstrap_auto_bind("initialize")
 
     @filter.command_group("qzone")
     def qzone(self):
@@ -5420,7 +5420,7 @@ class QzoneStablePlugin(Star):
     async def qzone_on_astrbot_loaded(self):
         """AstrBot 加载完成后启动定时任务，并预热 Qzone Cookie。"""
         self._start_scheduled_tasks()
-        self._schedule_bootstrap_auto_bind("astrbot load", force_refresh=True)
+        self._schedule_bootstrap_auto_bind("astrbot load")
 
     @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP)
     async def qzone_capture_aiocqhttp_client(self, event: AstrMessageEvent):
